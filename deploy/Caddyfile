@@ -1,0 +1,40 @@
+# Proxy reverso da Sofia, com HTTPS automatico.
+#
+# O Caddy obtem e renova o certificado Let's Encrypt sozinho. Nao ha cron,
+# nao ha renovacao manual, nao ha certificado para esquecer de trocar.
+#
+# Instalacao:
+#   sudo cp deploy/Caddyfile /etc/caddy/Caddyfile
+#   (trocar sofia.exemplo.com.br pelo dominio real)
+#   sudo systemctl reload caddy
+#
+# A Sofia ouve apenas em 127.0.0.1. Isso e intencional: quem fala com a
+# internet e o Caddy. O processo Python nunca fica exposto direto.
+
+sofia.exemplo.com.br {
+	encode gzip
+
+	# O Maxbot nao assina a requisicao. A unica protecao do webhook e o
+	# segredo no caminho, validado pela aplicacao com comparacao em tempo
+	# constante. Nao ha o que o proxy possa checar aqui.
+	reverse_proxy 127.0.0.1:8000 {
+		# A aplicacao responde rapido; o envio ao Maxbot tem timeout de 10s.
+		transport http {
+			response_header_timeout 20s
+		}
+	}
+
+	# Log de acesso deliberadamente DESLIGADO.
+	#
+	# O segredo do webhook faz parte do caminho da URL
+	# (/webhook/maxbot/<segredo>). Qualquer log de acesso gravaria esse
+	# segredo em texto plano, em disco, a cada mensagem recebida — e o
+	# arquivo de log costuma ter permissao mais frouxa que o .env.
+	#
+	# O registro operacional que interessa ja existe do lado da aplicacao,
+	# via journald (`journalctl -u sofia -f`), sem expor o segredo. Erros do
+	# proprio Caddy continuam no log geral dele.
+	#
+	# Se um dia for preciso ligar o log de acesso aqui, redija o caminho
+	# antes: nao basta filtrar a query string.
+}

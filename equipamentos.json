@@ -1,0 +1,337 @@
+{
+  "objetivo": "Estrutura inicial para cadastrar equipamentos no fluxo de pre-venda da Sofia no Maxbot.",
+  "orientacoes_gerais": [
+    "Cada equipamento deve ajudar a Sofia a qualificar o lead antes do encaminhamento.",
+    "As perguntas devem ser feitas uma por vez no Maxbot.",
+    "A Sofia nao deve informar preco, estoque, prazo de entrega, frete ou condicoes comerciais.",
+    "Quando houver duvida, urgencia ou potencial de compra, encaminhar para atendimento humano."
+  ],
+  "equipamentos": [
+    {
+      "nome": "Fritadeira",
+      "tag": "equipamento_fritadeira",
+      "perguntas": [
+        {
+          "id": "tipo_uso",
+          "texto": "A fritadeira sera usada para qual tipo de preparo?",
+          "opcoes_resposta": [
+            "Batata frita",
+            "Salgados",
+            "Frango",
+            "Porcoes variadas",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "volume_producao",
+          "texto": "Qual sera o volume de uso esperado?",
+          "opcoes_resposta": [
+            "Baixo",
+            "Medio",
+            "Alto",
+            "Uso intenso durante o dia",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "tipo_energia",
+          "texto": "Voce prefere fritadeira a gas ou eletrica?",
+          "opcoes_resposta": [
+            "A gas",
+            "Eletrica",
+            "Quero orientacao",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "prazo_compra",
+          "texto": "Qual a previsao para compra?",
+          "opcoes_resposta": [
+            "Imediata",
+            "Nos proximos 30 dias",
+            "Em 1 a 3 meses",
+            "Ainda estou pesquisando"
+          ]
+        }
+      ],
+      "exige_humano_obrigatorio": true,
+      "observacoes": "Encaminhar para consultor para indicar capacidade, modelo, instalacao e condicoes comerciais."
+    },
+    {
+      "nome": "Freezer / Refrigeracao",
+      "tag": "equipamento_freezer_refrigeracao",
+      "perguntas": [
+        {
+          "id": "finalidade",
+          "texto": "Voce precisa refrigerar, congelar ou expor produtos?",
+          "opcoes_resposta": [
+            "Refrigerar",
+            "Congelar",
+            "Expor produtos",
+            "Armazenar produtos",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "tipo_produto",
+          "texto": "Quais produtos serao armazenados ou expostos?",
+          "opcoes_resposta": [
+            "Bebidas",
+            "Carnes",
+            "Laticinios",
+            "Congelados",
+            "Hortifruti",
+            "Outros"
+          ]
+        },
+        {
+          "id": "capacidade",
+          "texto": "Voce ja sabe a capacidade ou tamanho aproximado que precisa?",
+          "opcoes_resposta": [
+            "Pequeno",
+            "Medio",
+            "Grande",
+            "Tenho as medidas",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "tipo_negocio",
+          "texto": "O equipamento sera usado em qual tipo de negocio?",
+          "opcoes_resposta": [
+            "Restaurante",
+            "Mercado",
+            "Padaria",
+            "Acougue",
+            "Lanchonete",
+            "Outro"
+          ]
+        }
+      ],
+      "exige_humano_obrigatorio": true,
+      "observacoes": "Nao confirmar temperatura, consumo, disponibilidade ou dimensoes finais sem validacao do consultor."
+    },
+    {
+      "nome": "Forno",
+      "tag": "equipamento_forno",
+      "perguntas": [
+        {
+          "id": "tipo_preparo",
+          "texto": "O forno sera usado principalmente para qual preparo?",
+          "opcoes_resposta": [
+            "Paes",
+            "Pizzas",
+            "Bolos e confeitaria",
+            "Assados",
+            "Salgados",
+            "Uso variado"
+          ]
+        },
+        {
+          "id": "tipo_forno",
+          "texto": "Voce procura algum tipo especifico de forno?",
+          "opcoes_resposta": [
+            "Forno eletrico",
+            "Forno a gas",
+            "Forno combinado",
+            "Forno de pizza",
+            "Quero orientacao"
+          ]
+        },
+        {
+          "id": "producao",
+          "texto": "Qual e a producao esperada?",
+          "opcoes_resposta": [
+            "Pequena",
+            "Media",
+            "Grande",
+            "Uso intenso",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "estrutura",
+          "texto": "O local ja possui estrutura pronta para instalacao?",
+          "opcoes_resposta": [
+            "Sim",
+            "Nao",
+            "Em reforma",
+            "Ainda vou montar o espaco"
+          ]
+        }
+      ],
+      "exige_humano_obrigatorio": true,
+      "observacoes": "Consultor deve validar aplicacao, energia/gas, capacidade e instalacao adequada."
+    },
+    {
+      "nome": "Fogao Industrial",
+      "tag": "equipamento_fogao_industrial",
+      "perguntas": [
+        {
+          "id": "quantidade_bocas",
+          "texto": "Voce ja sabe quantas bocas precisa?",
+          "opcoes_resposta": [
+            "2 bocas",
+            "4 bocas",
+            "6 bocas",
+            "8 bocas ou mais",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "tipo_uso",
+          "texto": "Qual sera o tipo de uso do fogao?",
+          "opcoes_resposta": [
+            "Restaurante",
+            "Lanchonete",
+            "Cozinha industrial",
+            "Evento ou buffet",
+            "Outro"
+          ]
+        },
+        {
+          "id": "intensidade",
+          "texto": "Qual sera a intensidade de uso?",
+          "opcoes_resposta": [
+            "Baixa",
+            "Media",
+            "Alta",
+            "Uso continuo",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "instalacao",
+          "texto": "O local ja possui ponto de gas preparado?",
+          "opcoes_resposta": [
+            "Sim",
+            "Nao",
+            "Em preparacao",
+            "Nao sei informar"
+          ]
+        }
+      ],
+      "exige_humano_obrigatorio": true,
+      "observacoes": "Nao orientar instalacao de gas tecnicamente. Encaminhar para consultor e, se necessario, equipe especializada."
+    },
+    {
+      "nome": "Chapa",
+      "tag": "equipamento_chapa",
+      "perguntas": [
+        {
+          "id": "tipo_alimento",
+          "texto": "A chapa sera usada principalmente para qual preparo?",
+          "opcoes_resposta": [
+            "Hamburguer",
+            "Lanches",
+            "Carnes",
+            "Porcoes",
+            "Uso variado"
+          ]
+        },
+        {
+          "id": "tamanho",
+          "texto": "Voce ja sabe o tamanho aproximado da chapa?",
+          "opcoes_resposta": [
+            "Pequena",
+            "Media",
+            "Grande",
+            "Tenho as medidas",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "tipo_energia",
+          "texto": "Voce prefere chapa a gas ou eletrica?",
+          "opcoes_resposta": [
+            "A gas",
+            "Eletrica",
+            "Quero orientacao",
+            "Ainda nao sei"
+          ]
+        },
+        {
+          "id": "prazo_compra",
+          "texto": "Qual a previsao para compra?",
+          "opcoes_resposta": [
+            "Imediata",
+            "Nos proximos 30 dias",
+            "Em 1 a 3 meses",
+            "Ainda estou pesquisando"
+          ]
+        }
+      ],
+      "exige_humano_obrigatorio": true,
+      "observacoes": "Encaminhar para consultor para validar tamanho, modelo e necessidade de instalacao."
+    },
+    {
+      "nome": "Outro equipamento",
+      "tag": "equipamento_outro",
+      "perguntas": [
+        {
+          "id": "descricao",
+          "texto": "Pode descrever qual equipamento voce procura?",
+          "opcoes_resposta": [
+            "Vou digitar o nome",
+            "Nao sei o nome",
+            "Tenho uma foto ou referencia",
+            "Preciso de orientacao"
+          ]
+        },
+        {
+          "id": "finalidade",
+          "texto": "O que voce precisa que esse equipamento faca?",
+          "opcoes_resposta": [
+            "Preparar alimentos",
+            "Refrigerar ou congelar",
+            "Expor produtos",
+            "Lavar ou higienizar",
+            "Organizar a cozinha",
+            "Outro uso"
+          ]
+        },
+        {
+          "id": "tipo_negocio",
+          "texto": "Esse equipamento sera usado em qual tipo de negocio?",
+          "opcoes_resposta": [
+            "Restaurante",
+            "Lanchonete",
+            "Padaria",
+            "Mercado",
+            "Cozinha industrial",
+            "Outro"
+          ]
+        },
+        {
+          "id": "prazo_compra",
+          "texto": "Qual a previsao para compra?",
+          "opcoes_resposta": [
+            "Imediata",
+            "Nos proximos 30 dias",
+            "Em 1 a 3 meses",
+            "Ainda estou pesquisando"
+          ]
+        }
+      ],
+      "exige_humano_obrigatorio": true,
+      "observacoes": "Usar este caminho quando o cliente nao encontrar o equipamento no menu ou precisar de ajuda para identificar a melhor opcao."
+    }
+  ],
+  "dados_complementares_para_todos": [
+    {
+      "id": "nome",
+      "texto": "Qual e o seu nome?",
+      "obrigatorio": true
+    },
+    {
+      "id": "telefone_whatsapp",
+      "texto": "Qual telefone ou WhatsApp para contato?",
+      "obrigatorio": true
+    },
+    {
+      "id": "cidade_estado",
+      "texto": "Voce fala de qual cidade e estado?",
+      "obrigatorio": true
+    }
+  ]
+}

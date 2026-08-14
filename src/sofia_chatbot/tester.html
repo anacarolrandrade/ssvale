@@ -1,0 +1,129 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Teste local da Sofia</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, system-ui, sans-serif; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: #f4f6f8; color: #14213d; }
+    main { width: min(760px, 100%); min-height: 100vh; margin: auto; background: white; display: flex; flex-direction: column; }
+    header { padding: 22px 24px; border-bottom: 1px solid #e5e7eb; }
+    header h1 { margin: 0 0 4px; font-size: 22px; }
+    header p { margin: 0; color: #667085; font-size: 14px; }
+    #messages { flex: 1; padding: 24px; min-height: 420px; overflow-y: auto; }
+    .row { display: flex; margin: 0 0 14px; }
+    .row.user { justify-content: flex-end; }
+    .bubble { max-width: 82%; padding: 12px 14px; border-radius: 14px; line-height: 1.45; white-space: pre-wrap; }
+    .bot .bubble { background: #eef2f6; border-bottom-left-radius: 4px; }
+    .user .bubble { background: #146c43; color: white; border-bottom-right-radius: 4px; }
+    .options { display: flex; flex-wrap: wrap; gap: 8px; margin: -3px 0 16px; }
+    .options button { border: 1px solid #146c43; background: white; color: #146c43; padding: 9px 11px; border-radius: 999px; cursor: pointer; }
+    .summary { margin: 8px 0 16px; padding: 12px; border-left: 4px solid #f59e0b; background: #fffbeb; white-space: pre-wrap; font-size: 13px; }
+    form { display: flex; gap: 8px; padding: 16px 24px 8px; border-top: 1px solid #e5e7eb; }
+    input { flex: 1; min-width: 0; padding: 12px; border: 1px solid #cbd5e1; border-radius: 9px; font-size: 16px; }
+    button.primary { border: 0; background: #146c43; color: white; padding: 0 18px; border-radius: 9px; cursor: pointer; font-weight: 600; }
+    footer { display: flex; justify-content: space-between; align-items: center; padding: 8px 24px 18px; color: #667085; font-size: 12px; }
+    footer button { border: 0; background: transparent; color: #b42318; cursor: pointer; }
+    .error { color: #b42318; }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Sofia — teste local</h1>
+    <p>Ambiente isolado: não envia mensagens ao Maxbot nem ao WhatsApp.</p>
+  </header>
+  <section id="messages" aria-live="polite"></section>
+  <form id="form">
+    <input id="message" autocomplete="off" placeholder="Digite como se fosse um cliente..." autofocus>
+    <button class="primary" type="submit">Enviar</button>
+  </form>
+  <footer>
+    <span id="status">Somente neste computador</span>
+    <button id="reset" type="button">Recomeçar conversa</button>
+  </footer>
+</main>
+<script>
+  const sessionId = `teste-pessoal-${crypto.randomUUID()}`;
+  const messages = document.querySelector("#messages");
+  const input = document.querySelector("#message");
+  const status = document.querySelector("#status");
+
+  function addBubble(text, role) {
+    const row = document.createElement("div");
+    row.className = `row ${role}`;
+    const bubble = document.createElement("div");
+    bubble.className = "bubble";
+    bubble.textContent = text;
+    row.appendChild(bubble);
+    messages.appendChild(row);
+  }
+
+  function addReply(reply) {
+    addBubble(reply.message, "bot");
+    if (reply.options?.length) {
+      const options = document.createElement("div");
+      options.className = "options";
+      reply.options.forEach(label => {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = label;
+        button.addEventListener("click", () => send(label));
+        options.appendChild(button);
+      });
+      messages.appendChild(options);
+    }
+    if (reply.summary) {
+      const summary = document.createElement("div");
+      summary.className = "summary";
+      summary.textContent = reply.summary;
+      messages.appendChild(summary);
+    }
+    messages.scrollTop = messages.scrollHeight;
+  }
+
+  async function send(text) {
+    const clean = text.trim();
+    if (!clean) return;
+    addBubble(clean, "user");
+    input.value = "";
+    status.textContent = "Sofia está respondendo...";
+    try {
+      const response = await fetch("/chat", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({session_id: sessionId, message: clean})
+      });
+      const reply = await response.json();
+      if (!response.ok) throw new Error(reply.error || "Falha no teste");
+      addReply(reply);
+      status.textContent = reply.status === "handoff" ? "Encaminhamento simulado concluído" : "Somente neste computador";
+    } catch (error) {
+      status.textContent = `Erro: ${error.message}`;
+      status.className = "error";
+    }
+    input.focus();
+  }
+
+  document.querySelector("#form").addEventListener("submit", event => {
+    event.preventDefault();
+    send(input.value);
+  });
+  document.querySelector("#reset").addEventListener("click", async () => {
+    await fetch("/reset", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({session_id: sessionId})
+    });
+    messages.replaceChildren();
+    status.textContent = "Conversa reiniciada";
+    status.className = "";
+    send("Começar");
+  });
+
+  send("Começar");
+</script>
+</body>
+</html>

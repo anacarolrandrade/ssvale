@@ -1,0 +1,39 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "waba-exemplo",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Cliente Exemplo"
+                },
+                "wa_id": "5531999990000"
+              }
+            ],
+            "messages": [
+              {
+                "from": "5531999990000",
+                "id": "wamid.exemplo.lista",
+                "timestamp": "1720000002",
+                "type": "interactive",
+                "interactive": {
+                  "type": "list_reply",
+                  "list_reply": {
+                    "id": "opt_1_fritadeira",
+                    "title": "Fritadeira"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

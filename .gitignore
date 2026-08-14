@@ -1,0 +1,22 @@
+# Segredos. Nunca versionar.
+.env
+
+# Dados com PII do piloto (sessoes e log de eventos).
+data/
+.runtime/
+*.log
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Copias historicas de revisao. Ficam no disco para consulta,
+# mas nao entram no repositorio: sao duplicatas do codigo da raiz
+# e somam ~54 MB. Ver CLAUDE.md.
+revisao-recebida-fable-5/
+entrega-fable-5/
+ssvale-chatbot-mvp-revisao-claude.zip
+
+# Sistema operacional
+Thumbs.db
+.DS_Store

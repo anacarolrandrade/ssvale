@@ -1,0 +1,52 @@
+# Unidade systemd para a Sofia.
+#
+# Instalacao no servidor:
+#   sudo cp deploy/sofia.service /etc/systemd/system/sofia.service
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now sofia
+#
+# Ver o log ao vivo:
+#   sudo journalctl -u sofia -f
+#
+# Desligar a Sofia (botao de panico):
+#   sudo systemctl stop sofia
+
+[Unit]
+Description=Sofia - chatbot de triagem da SS Vale
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=sofia
+Group=sofia
+WorkingDirectory=/opt/sofia
+
+# O .env fica FORA da arvore de codigo: um deploy nao pode sobrescrever
+# segredo, e o arquivo tem permissao 600 para o usuario do servico.
+Environment=SOFIA_ENV_FILE=/etc/sofia/sofia.env
+Environment=PYTHONPATH=/opt/sofia/src
+# Redundante com configurar_saida_sem_buffer(), mas garante o log ao vivo
+# mesmo se alguem chamar o modulo por outro caminho.
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/usr/bin/python3 -m sofia_chatbot
+
+# SIGTERM e tratado pela aplicacao: ela para de aceitar conexoes e termina as
+# requisicoes em voo antes de sair. 30s e folga suficiente, ja que o envio ao
+# Maxbot tem timeout de 10s.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+Restart=on-failure
+RestartSec=5
+
+# Endurecimento basico. A Sofia so precisa escrever no diretorio de dados.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/sofia
+
+[Install]
+WantedBy=multi-user.target

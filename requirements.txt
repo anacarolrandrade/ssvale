@@ -1,0 +1,12 @@
+# A Sofia nao usa nenhuma dependencia externa: so a biblioteca padrao do
+# Python (http.server, sqlite3, urllib, hmac, json, zoneinfo nao usado).
+#
+# Este arquivo existe de proposito e vazio. Ele documenta a decisao e permite
+# que `pip install -r requirements.txt` funcione no provisionamento sem
+# tratamento especial.
+#
+# Antes de adicionar qualquer linha aqui, considere se o ganho compensa: hoje
+# o deploy nao tem etapa de build, nao quebra por conflito de versao e nao
+# precisa de ambiente virtual.
+#
+# Versao minima do Python: 3.11 (ver pyproject.toml).

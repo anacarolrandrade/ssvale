@@ -1,0 +1,12 @@
+[project]
+name = "ssvale-sofia-chatbot"
+version = "0.1.0"
+description = "Chatbot Sofia da SS Vale com camada independente de LLM."
+requires-python = ">=3.11"
+
+[project.optional-dependencies]
+dev = []
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

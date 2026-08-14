@@ -1,0 +1,39 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "waba-exemplo",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "553133330000",
+              "phone_number_id": "phone-number-id"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Cliente Exemplo"
+                },
+                "wa_id": "5531999990000"
+              }
+            ],
+            "messages": [
+              {
+                "from": "5531999990000",
+                "id": "wamid.exemplo.texto",
+                "timestamp": "1720000000",
+                "text": {
+                  "body": "quero comprar uma fritadeira"
+                },
+                "type": "text"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

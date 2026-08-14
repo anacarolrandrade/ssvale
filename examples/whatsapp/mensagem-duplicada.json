@@ -1,0 +1,35 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "waba-exemplo",
+      "changes": [
+        {
+          "field": "messages",
+          "value": {
+            "messaging_product": "whatsapp",
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Cliente Exemplo"
+                },
+                "wa_id": "5531999990000"
+              }
+            ],
+            "messages": [
+              {
+                "from": "5531999990000",
+                "id": "wamid.exemplo.duplicada",
+                "timestamp": "1720000006",
+                "text": {
+                  "body": "Comecar"
+                },
+                "type": "text"
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

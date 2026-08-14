@@ -1,0 +1,16 @@
+{
+  "origin": "2",
+  "contact": {
+    "id": "1004",
+    "name": "Cliente",
+    "surname": "Preco",
+    "whatsapp": "5531999990004",
+    "segmentation": ["SOFIA_API_PILOTO"],
+    "in_attendance": "0"
+  },
+  "msg_id": "MAXBOT-PRECO-001",
+  "msg_timestamp": "1785859380",
+  "msg_date": "2026-08-04 09:03:00",
+  "msg": "Quanto custa uma fritadeira?",
+  "type": "T"
+}
