@@ -43,6 +43,12 @@ class Settings:
     # Timeout do envio ao Maxbot. O envio acontece dentro do handler do
     # webhook: um valor alto segura o ACK e pode provocar reenvio.
     maxbot_timeout_seconds: float = 10.0
+    # Horas ate uma sessao em handoff voltar a ser atendida pela Sofia.
+    # 0 desliga a liberacao automatica e volta ao reset manual.
+    handoff_expira_horas: float = 24.0
+    # Token do endpoint /status. Vazio desliga o endpoint.
+    # O /status devolve apenas contagens, nunca conteudo de conversa.
+    status_token: str = ""
     host: str = "127.0.0.1"
     port: int = 8000
     # Caminho do arquivo .env efetivamente carregado. Vazio quando nenhum
@@ -139,6 +145,10 @@ def load_settings(env_path: str | Path | None = None) -> Settings:
         maxbot_send_messages=_as_bool(value("MAXBOT_SEND_MESSAGES", "false")),
         maxbot_api_url=value("MAXBOT_API_URL", "https://app.maxbot.com.br/api/v1.php"),
         maxbot_timeout_seconds=_as_float(value("MAXBOT_TIMEOUT_SECONDS"), 10.0),
+        handoff_expira_horas=_as_float_permitindo_zero(
+            value("HANDOFF_EXPIRA_HORAS"), 24.0
+        ),
+        status_token=value("STATUS_TOKEN"),
         host=value("SOFIA_HOST", "127.0.0.1"),
         # `PORT` e a convencao das plataformas gerenciadas. `SOFIA_PORT`
         # continua tendo precedencia por ser a variavel propria do projeto.
@@ -157,6 +167,15 @@ def _as_float(value: str, default: float) -> float:
     except (AttributeError, ValueError):
         return default
     return parsed if parsed > 0 else default
+
+
+def _as_float_permitindo_zero(value: str, default: float) -> float:
+    """Como `_as_float`, mas zero e valido: significa funcionalidade desligada."""
+    try:
+        parsed = float(value.strip())
+    except (AttributeError, ValueError):
+        return default
+    return parsed if parsed >= 0 else default
 
 
 def _resolve_port(sofia_port: str, platform_port: str) -> int:

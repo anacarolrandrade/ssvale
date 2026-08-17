@@ -26,11 +26,34 @@ from sofia_chatbot.channels.maxbot import (
     verify_maxbot_webhook_path,
 )
 from sofia_chatbot.config import Settings
-from sofia_chatbot.domain import ConversationStatus
+from sofia_chatbot.domain import ConversationState, ConversationStatus
 from sofia_chatbot.event_log import create_event_logger
-from sofia_chatbot.flow import SofiaFlow
+from sofia_chatbot.flow import SofiaFlow, handoff_expirado
 from sofia_chatbot.llm.factory import create_llm_client
 from sofia_chatbot.session_store import create_session_store
+
+
+def mascarar_telefone(valor: str) -> str:
+    """Mantem o rastro util sem escrever o telefone inteiro no log.
+
+    O log operacional e lido no dia a dia, muitas vezes com a tela
+    compartilhada, e vai para o journald sem a mesma protecao do banco. Quatro
+    digitos finais bastam para casar uma conversa com uma reclamacao.
+    """
+    digitos = "".join(c for c in str(valor or "") if c.isdigit())
+    if len(digitos) <= 4:
+        return "***"
+    return f"***{digitos[-4:]}"
+
+
+def registrar(evento: str, **campos: Any) -> None:
+    """Uma linha por acontecimento, em `chave=valor`, direto no stdout.
+
+    Formato pensado para `journalctl -u sofia -f` e para `grep`. Nunca inclui
+    texto de conversa, resumo de lead nem telefone completo.
+    """
+    partes = " ".join(f"{chave}={valor}" for chave, valor in campos.items() if valor != "")
+    print(f"[sofia] {evento} {partes}".rstrip())
 
 
 class SofiaApplication:
@@ -97,6 +120,28 @@ class SofiaApplication:
     def debug_events(self, session_id: str | None = None, limit: int = 20) -> dict[str, Any]:
         return {
             "events": self.event_logger.list_events(session_id=session_id, limit=limit),
+        }
+
+    def status(self, janela_horas: float = 24.0) -> dict[str, Any]:
+        """Resumo operacional para consulta remota. Somente contagens."""
+        contagens = self.event_logger.contar_por_tipo(janela_horas)
+        return {
+            "ok": True,
+            "janela_horas": janela_horas,
+            "envio_real_ligado": self.settings.maxbot_send_messages,
+            "modo_piloto": self.settings.maxbot_pilot_mode,
+            "handoff_expira_horas": self.settings.handoff_expira_horas,
+            "eventos": contagens,
+            "erros": contagens.get("maxbot_error", 0)
+            + contagens.get("whatsapp_error", 0),
+            "respondidas": contagens.get("maxbot_message", 0),
+            "ignoradas": (
+                contagens.get("maxbot_pilot_filtered", 0)
+                + contagens.get("maxbot_human_attendance", 0)
+                + contagens.get("maxbot_handoff_pending", 0)
+            ),
+            "duplicadas": contagens.get("maxbot_duplicate", 0),
+            "handoff_liberados": contagens.get("maxbot_handoff_expirado", 0),
         }
 
     def verify_whatsapp_webhook(self, mode: str, token: str, challenge: str) -> tuple[int, str]:
@@ -224,6 +269,11 @@ class SofiaApplication:
                 self.event_logger.log(
                     "maxbot_human_attendance", inbound.session_id, ignored_payload
                 )
+                registrar(
+                    "ignorada",
+                    motivo="atendimento_humano",
+                    de=mascarar_telefone(inbound.from_number),
+                )
                 ignored.append(ignored_payload)
                 continue
 
@@ -236,6 +286,11 @@ class SofiaApplication:
                 self.event_logger.log(
                     "maxbot_pilot_filtered", inbound.session_id, ignored_payload
                 )
+                registrar(
+                    "ignorada",
+                    motivo="fora_do_piloto",
+                    de=mascarar_telefone(inbound.from_number),
+                )
                 ignored.append(ignored_payload)
                 continue
 
@@ -245,6 +300,43 @@ class SofiaApplication:
                 state = deepcopy(self.store.get(inbound.session_id))
                 if not state.lead.telefone_whatsapp:
                     state.lead.telefone_whatsapp = inbound.from_number
+                if state.status == ConversationStatus.HANDOFF and handoff_expirado(
+                    state, self.settings.handoff_expira_horas
+                ):
+                    # Chegamos aqui somente com `in_attendance` falso: a
+                    # verificacao de atendimento humano acontece antes e sai do
+                    # laco. A expiracao libera o handoff da Sofia, nunca uma
+                    # conversa em que ha um atendente.
+                    expirado_payload = {
+                        "message_id": inbound.message_id,
+                        "from": inbound.from_number,
+                        "handoff_since": state.handoff_since,
+                        "limite_horas": self.settings.handoff_expira_horas,
+                        "motivo": (
+                            "sem_registro_de_inicio"
+                            if not state.handoff_since
+                            else "prazo_excedido"
+                        ),
+                        "current_block": state.current_block,
+                    }
+                    self.event_logger.log(
+                        "maxbot_handoff_expirado",
+                        inbound.session_id,
+                        expirado_payload,
+                    )
+                    registrar(
+                        "handoff_liberado",
+                        de=mascarar_telefone(inbound.from_number),
+                        motivo=expirado_payload["motivo"],
+                        limite_horas=self.settings.handoff_expira_horas,
+                    )
+                    # Sessao nova em memoria, ainda nao persistida: a gravacao
+                    # acontece so depois que o Maxbot aceita a resposta, como
+                    # no resto deste fluxo. Se o envio falhar, a expiracao e
+                    # reavaliada no reenvio.
+                    state = ConversationState(session_id=inbound.session_id)
+                    state.lead.telefone_whatsapp = inbound.from_number
+
                 if state.status == ConversationStatus.HANDOFF:
                     ignored_payload = {
                         "message_id": inbound.message_id,
@@ -256,6 +348,11 @@ class SofiaApplication:
                         "maxbot_handoff_pending",
                         inbound.session_id,
                         ignored_payload,
+                    )
+                    registrar(
+                        "ignorada",
+                        motivo="handoff_pendente",
+                        de=mascarar_telefone(inbound.from_number),
                     )
                     ignored.append(ignored_payload)
                     continue
@@ -281,6 +378,11 @@ class SofiaApplication:
                         "from": inbound.from_number,
                         "error": f"{type(exc).__name__}: {exc}",
                     },
+                )
+                registrar(
+                    "ERRO",
+                    de=mascarar_telefone(inbound.from_number),
+                    excecao=type(exc).__name__,
                 )
                 errors.append(
                     {"message_id": inbound.message_id, "error": "processing_failed"}
@@ -313,6 +415,13 @@ class SofiaApplication:
             }
             self.event_logger.log(
                 "maxbot_message", inbound.session_id, event_payload
+            )
+            registrar(
+                "respondida",
+                de=mascarar_telefone(inbound.from_number),
+                bloco=state.current_block,
+                situacao=state.status.value,
+                envio="real" if send_result.get("sent") else "dry_run",
             )
             processed.append(event_payload)
 
@@ -347,6 +456,27 @@ def create_handler(app: SofiaApplication) -> type[BaseHTTPRequestHandler]:
                 return
             if parsed.path == "/health":
                 self._json({"ok": True})
+                return
+            if parsed.path == "/status":
+                # Contadores para acompanhamento remoto. Exige token proprio,
+                # separado dos endpoints de debug: estes devolvem PII e
+                # continuam desligados em producao; o /status, nao.
+                expected = app.settings.status_token
+                if not expected:
+                    self.send_error(404)
+                    return
+                supplied = self.headers.get("X-Status-Token", "")
+                if not supplied or not hmac.compare_digest(
+                    supplied.encode("utf-8"), expected.encode("utf-8")
+                ):
+                    self._json({"error": "nao_autorizado"}, status=401)
+                    return
+                query = parse_qs(parsed.query)
+                try:
+                    janela = float(query.get("horas", ["24"])[0])
+                except ValueError:
+                    janela = 24.0
+                self._json(app.status(max(0.0, min(janela, 720.0))))
                 return
             if parsed.path == "/debug/session":
                 if not app.settings.debug_endpoints_enabled:

@@ -2,6 +2,50 @@
 
 Status do backend MVP da Sofia para primeiro teste controlado.
 
+## Fase 3 concluida - observabilidade e handoff - 14/08/2026
+
+As duas lacunas que definiam se a Ana viraria suporte permanente do cliente.
+Nenhuma delas depende do Maxbot nem da SS Vale.
+
+**B6 - liberacao automatica do handoff.** A sessao passa a registrar
+`handoff_since` e volta a ser atendida sozinha apos `HANDOFF_EXPIRA_HORAS`
+(padrao 24h; `0` desliga). Antes, quem concluia o fluxo ficava mudo ate alguem
+rodar `scripts/resetar_sessao.py --confirmar` a mao — confirmado no banco real,
+a sessao do telefone piloto ficou presa de 04/08 a 14/08.
+
+- A expiracao **nunca** sobrepoe atendimento humano: o `in_attendance` do
+  Maxbot e verificado antes e sai do laco. Ha teste dedicado a essa invariante.
+- Sessoes gravadas antes desta mudanca nao tem `handoff_since`. Sao tratadas
+  como expiradas, com motivo proprio no log (`sem_registro_de_inicio`), porque
+  mante-las presas seria preservar exatamente o defeito corrigido.
+- A sessao so e persistida depois que o Maxbot aceita a resposta, como no
+  resto do fluxo.
+
+**Decisao pendente da SS Vale:** as 24 horas sao sugestao. Quem conhece o ritmo
+do Comercial e eles.
+
+**B5 - enxergar sem abrir shell no servidor.**
+
+- Log de uma linha por acontecimento em `stdout`, formato `chave=valor`, para
+  `journalctl -u sofia -f`. Telefone mascarado (`***2222`); **nunca** texto de
+  conversa, resumo de lead ou telefone completo. Ha teste que falha se o
+  telefone inteiro ou o texto do cliente aparecerem no log.
+- Endpoint `GET /status`, autenticado por `STATUS_TOKEN` no cabecalho
+  `X-Status-Token`, devolvendo apenas contagens: respondidas, ignoradas,
+  duplicadas, erros, handoffs liberados, e o estado das travas de seguranca
+  (`envio_real_ligado`, `modo_piloto`). Sem token configurado, a rota nao
+  existe (404). Token errado, 401.
+- O `/status` e proposital e deliberadamente separado dos `/debug/*`, que
+  devolvem PII sem autenticacao e continuam desligados em producao.
+
+**Validacao:** 143 testes, smoke test, homologacao e ensaio aprovados.
+Verificado no ar: sessao presa em handoff ha 30 horas foi liberada sozinha
+quando o cliente voltou a escrever, com `handoff_liberado` no log e
+`handoff_liberados: 1` no `/status`; `/status` sem token respondeu 401.
+
+**Ainda pendente:** B3 (disco persistente) e B12 (URL estavel), que dependem do
+VPS; e o handoff real, que depende do chamado ao suporte Maxbot.
+
 ## Preparacao para deploy - 14/08/2026
 
 Diagnostico completo em `DIAGNOSTICO-DEPLOY.md` (itens B1 a B13) e plano

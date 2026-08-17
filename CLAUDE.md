@@ -1,6 +1,24 @@
 # Handoff para continuidade no Claude
 
-## Estado mais recente - preparacao para deploy, 14/08/2026
+## Estado mais recente - Fase 3 concluida, 14/08/2026
+
+- **B6 aplicado:** sessoes em handoff se liberam sozinhas apos
+  `HANDOFF_EXPIRA_HORAS` (padrao 24h, `0` desliga). O estado agora carrega
+  `handoff_since`. A expiracao nunca sobrepoe atendimento humano — o
+  `in_attendance` e checado antes. Sessoes antigas sem o campo sao tratadas
+  como expiradas de proposito. Regressao em `tests/test_handoff_expiracao.py`.
+- **B5 aplicado:** log de uma linha por acontecimento em `stdout`
+  (`[sofia] respondida de=***2222 bloco=... envio=dry_run`) e endpoint
+  `GET /status` autenticado por `STATUS_TOKEN` no cabecalho `X-Status-Token`,
+  devolvendo **somente contagens**. Regressao em
+  `tests/test_observabilidade.py`, incluindo teste que falha se telefone
+  completo ou texto de conversa vazarem para o log.
+- **Validacao atual: 143 testes**, smoke, homologacao e ensaio aprovados.
+- **Decisao pendente da SS Vale:** o prazo de 24h para expirar o handoff.
+- Nao confunda `/status` com `/debug/*`: o primeiro so devolve numeros e pode
+  ficar exposto; os segundos devolvem PII e continuam desligados em producao.
+
+## Estado anterior - preparacao para deploy, 14/08/2026
 
 - Leia `DIAGNOSTICO-DEPLOY.md` (o que impede de rodar fora da maquina local,
   itens B1 a B13) e `PLANO-PILOTO-PRODUCAO.md` (plano faseado, ~17h em 5
@@ -128,7 +146,7 @@ py scripts/homologar_canais.py
 py scripts/ensaio_janela_maxbot.py
 ```
 
-O criterio atual e `Ran 112 tests ... OK`.
+O criterio atual e `Ran 143 tests ... OK`.
 
 Se o launcher `py` nao existir, use o executavel Python disponivel no ambiente.
 Durante a suite aparece intencionalmente um traceback com

@@ -118,6 +118,7 @@ def _state_to_dict(state: ConversationState) -> dict:
         "current_block": state.current_block,
         "tags": sorted(state.tags),
         "status": state.status.value,
+        "handoff_since": state.handoff_since,
         "lead": {
             "nome_cliente": state.lead.nome_cliente,
             "telefone_whatsapp": state.lead.telefone_whatsapp,
@@ -138,6 +139,8 @@ def _state_from_dict(data: dict) -> ConversationState:
         current_block=data.get("current_block", "BLOCO_00_BOAS_VINDAS"),
         tags=set(data.get("tags", [])),
         status=ConversationStatus(data.get("status", ConversationStatus.ACTIVE.value)),
+        # Sessoes gravadas antes da liberacao automatica nao tem este campo.
+        handoff_since=data.get("handoff_since"),
         lead=LeadData(
             nome_cliente=lead_data.get("nome_cliente"),
             telefone_whatsapp=lead_data.get("telefone_whatsapp"),

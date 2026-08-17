@@ -1,4 +1,5 @@
 import re
+from datetime import datetime, timedelta, timezone
 
 from sofia_chatbot.domain import BotReply, ConversationState, ConversationStatus
 from sofia_chatbot.guardrails import (
@@ -16,6 +17,49 @@ _POS_VENDA_REGEX = re.compile(r"\bpos[\s\-]?venda\b|\bpos\b|\bsuporte\b")
 _GREETING_REGEX = re.compile(
     r"^(oi|ola|bom\s+dia|boa\s+tarde|boa\s+noite|comecar|inicio|menu)[!.?\s]*$"
 )
+
+
+def agora_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def handoff_expirado(
+    state: ConversationState,
+    limite_horas: float,
+    agora: datetime | None = None,
+) -> bool:
+    """Diz se uma sessao em handoff ja pode voltar a ser atendida pela Sofia.
+
+    Sem isso, quem conclui o fluxo fica em silencio permanente: a sessao so sai
+    de `handoff` com `scripts/resetar_sessao.py --confirmar`, rodado a mao. Num
+    piloto de semanas, com numero dedicado e sem menu de fallback, o cliente que
+    voltasse dias depois simplesmente nao seria respondido por ninguem.
+
+    Isto NAO decide sobre atendimento humano em andamento. O silencio durante
+    atendimento vem do `in_attendance` que o Maxbot envia a cada mensagem, e e
+    verificado antes desta funcao. A expiracao so libera o handoff da propria
+    Sofia.
+    """
+    if state.status != ConversationStatus.HANDOFF:
+        return False
+    if limite_horas <= 0:
+        # Expiracao desligada: volta ao comportamento de reset manual.
+        return False
+    if not state.handoff_since:
+        # Sessao gravada antes desta funcionalidade existir. Nao ha como saber
+        # ha quanto tempo esta parada, e manter presa perpetuamente e o proprio
+        # defeito que estamos corrigindo. Liberamos, com motivo distinto no log.
+        return True
+
+    try:
+        inicio = datetime.fromisoformat(state.handoff_since)
+    except ValueError:
+        return True
+    if inicio.tzinfo is None:
+        inicio = inicio.replace(tzinfo=timezone.utc)
+
+    referencia = agora or agora_utc()
+    return referencia - inicio >= timedelta(hours=limite_horas)
 
 
 MENU_OPTIONS = [
@@ -453,6 +497,7 @@ class SofiaFlow:
         state.tags.add(destination_tag)
         state.current_block = destination_block
         state.status = ConversationStatus.HANDOFF
+        state.handoff_since = agora_utc().isoformat(timespec="seconds")
         summary = self._summary(state)
         return BotReply(
             message="Pronto, já registrei suas informações. A equipe da SS Vale vai continuar o atendimento com você.",

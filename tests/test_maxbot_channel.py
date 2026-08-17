@@ -21,6 +21,7 @@ from sofia_chatbot.channels.maxbot import (
 )
 from sofia_chatbot.config import Settings
 from sofia_chatbot.domain import BotReply, ConversationStatus
+from sofia_chatbot.flow import agora_utc
 
 
 def maxbot_text_payload(
@@ -425,6 +426,10 @@ class MaxbotApplicationWebhookTest(unittest.TestCase):
             state = app.store.get("5531911112222")
             state.status = ConversationStatus.HANDOFF
             state.current_block = "BLOCO_ENCAMINHAMENTO_COMERCIAL"
+            # Handoff recem-criado. O marco precisa ser explicito: uma sessao
+            # em handoff sem `handoff_since` e tratada como legada e liberada
+            # pela expiracao automatica (ver tests/test_handoff_expiracao.py).
+            state.handoff_since = agora_utc().isoformat(timespec="seconds")
             app.store.save(state)
 
             with patch.object(

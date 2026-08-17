@@ -17,6 +17,9 @@ class EventLogger:
     def list_events(self, session_id: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
         ...
 
+    def contar_por_tipo(self, desde_horas: float = 24.0) -> dict[str, int]:
+        ...
+
 
 class NullEventLogger:
     def log(self, event_type: str, session_id: str, payload: dict[str, Any]) -> None:
@@ -30,6 +33,9 @@ class NullEventLogger:
 
     def list_events(self, session_id: str | None = None, limit: int = 20) -> list[dict[str, Any]]:
         return []
+
+    def contar_por_tipo(self, desde_horas: float = 24.0) -> dict[str, int]:
+        return {}
 
 
 class SQLiteEventLogger:
@@ -124,6 +130,30 @@ class SQLiteEventLogger:
             }
             for row in rows
         ]
+
+    def contar_por_tipo(self, desde_horas: float = 24.0) -> dict[str, int]:
+        """Contagem de eventos por tipo, para o /status.
+
+        Devolve somente numeros. Nunca texto de conversa, resumo de lead ou
+        telefone: o /status existe para responder "esta de pe e respondendo?"
+        sem virar uma segunda porta de acesso a dados pessoais.
+        """
+        janela = max(0.0, float(desde_horas))
+        conn = self._connect()
+        try:
+            rows = conn.execute(
+                """
+                SELECT event_type, COUNT(*)
+                FROM events
+                WHERE created_at >= datetime('now', ?)
+                GROUP BY event_type
+                ORDER BY COUNT(*) DESC
+                """,
+                (f"-{janela} hours",),
+            ).fetchall()
+        finally:
+            conn.close()
+        return {row[0]: row[1] for row in rows}
 
     def _connect(self) -> sqlite3.Connection:
         conn = sqlite3.connect(self.db_path, timeout=5.0)
