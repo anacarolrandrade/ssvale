@@ -1,5 +1,20 @@
 # Handoff para continuidade no Claude
 
+## Nota sobre o repositorio - 14/08/2026
+
+Repositorio: `https://github.com/anacarolrandrade/ssvale` (privado, conta da
+WeUp). Os commits existem localmente; o primeiro `git push` falhou apenas
+porque o vinculo `main` -> `origin/main` nao tinha sido gravado.
+
+Se `git push` reclamar de upstream, use uma vez:
+
+```powershell
+git push --set-upstream origin main
+```
+
+Rode sempre de dentro de `C:\ssvale-chatbot-mvp`. Fora da pasta, o git
+responde `not a git repository` e nada funciona.
+
 ## Estado mais recente - Fase 3 concluida, 14/08/2026
 
 - **B6 aplicado:** sessoes em handoff se liberam sozinhas apos
