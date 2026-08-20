@@ -5,10 +5,11 @@
 #
 # Uso (dentro do servidor, como root ou com sudo):
 #
-#   sudo bash provisionar.sh sofia-teste.seudominio.com.br <TOKEN_GITHUB>
+#   sudo bash provisionar.sh sofia-teste.seudominio.com.br
 #
-# O TOKEN_GITHUB e um Personal Access Token com escopo `repo`, usado apenas
-# para clonar o repositorio privado. Ele NAO fica gravado no servidor.
+# Na hora de acessar o repositorio privado, o script pede um Personal Access
+# Token de forma oculta. O token nao aparece no comando, no historico do shell
+# nem na configuracao do Git e e descartado assim que a atualizacao termina.
 #
 # O que este script faz:
 #   1. cria o usuario e os diretorios do servico
@@ -25,11 +26,20 @@
 set -euo pipefail
 
 DOMINIO="${1:-}"
-TOKEN_GITHUB="${2:-}"
 REPO="github.com/anacarolrandrade/ssvale.git"
+TOKEN_GITHUB=""
+ASKPASS_FILE=""
+
+limpar_credencial_git() {
+	unset SOFIA_GITHUB_TOKEN TOKEN_GITHUB
+	if [[ -n "${ASKPASS_FILE:-}" && -f "$ASKPASS_FILE" ]]; then
+		rm -f -- "$ASKPASS_FILE"
+	fi
+}
+trap limpar_credencial_git EXIT
 
 if [[ -z "$DOMINIO" ]]; then
-	echo "ERRO: informe o dominio. Ex: sudo bash provisionar.sh sofia.exemplo.com.br <token>"
+	echo "ERRO: informe o dominio. Ex: sudo bash provisionar.sh sofia.exemplo.com.br"
 	exit 1
 fi
 if [[ $EUID -ne 0 ]]; then
@@ -40,7 +50,8 @@ fi
 echo "==> 1/7 Pacotes basicos"
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq
-apt-get install -y -qq git curl python3 debian-keyring debian-archive-keyring apt-transport-https
+apt-get install -y -qq git curl python3 gnupg iptables-persistent \
+	debian-keyring debian-archive-keyring apt-transport-https
 
 PYVER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
 echo "    Python $PYVER"
@@ -56,19 +67,42 @@ mkdir -p /opt/sofia /var/lib/sofia /etc/sofia
 chown -R sofia:sofia /var/lib/sofia
 
 echo "==> 3/7 Codigo"
+if [[ ! -r /dev/tty ]]; then
+	echo "ERRO: nao foi possivel ler o token com seguranca. Rode em uma sessao SSH interativa."
+	exit 1
+fi
+read -r -s -p "    Token GitHub (entrada oculta): " TOKEN_GITHUB </dev/tty
+echo >/dev/tty
+if [[ -z "$TOKEN_GITHUB" ]]; then
+	echo "ERRO: o token do GitHub e obrigatorio para acessar o repositorio privado."
+	exit 1
+fi
+
+# O Git pede usuario e senha a este auxiliar temporario. O token fica somente
+# em memoria, nunca na URL do clone, na configuracao do remoto ou no historico.
+ASKPASS_FILE=$(mktemp /tmp/sofia-git-askpass.XXXXXX)
+cat >"$ASKPASS_FILE" <<'EOF'
+#!/bin/sh
+case "$1" in
+	*Username*) printf '%s\n' 'x-access-token' ;;
+	*Password*) printf '%s\n' "$SOFIA_GITHUB_TOKEN" ;;
+	*) exit 1 ;;
+esac
+EOF
+chmod 700 "$ASKPASS_FILE"
+export SOFIA_GITHUB_TOKEN="$TOKEN_GITHUB"
+
 if [[ -d /opt/sofia/.git ]]; then
 	echo "    ja existe, atualizando"
-	git -C /opt/sofia fetch --quiet origin main
+	GIT_TERMINAL_PROMPT=0 GIT_ASKPASS="$ASKPASS_FILE" \
+		git -C /opt/sofia fetch --quiet origin main
 	git -C /opt/sofia reset --hard --quiet origin/main
 else
-	if [[ -z "$TOKEN_GITHUB" ]]; then
-		echo "ERRO: primeira instalacao precisa do token do GitHub."
-		exit 1
-	fi
-	git clone --quiet "https://${TOKEN_GITHUB}@${REPO}" /opt/sofia
-	# Remove o token da configuracao para nao ficar gravado em disco.
-	git -C /opt/sofia remote set-url origin "https://${REPO}"
+	GIT_TERMINAL_PROMPT=0 GIT_ASKPASS="$ASKPASS_FILE" \
+		git clone --quiet "https://${REPO}" /opt/sofia
 fi
+limpar_credencial_git
+trap - EXIT
 chown -R root:root /opt/sofia
 chmod -R go-w /opt/sofia
 
@@ -129,18 +163,15 @@ systemctl reload caddy 2>/dev/null || systemctl restart caddy
 echo "==> 6/7 Portas"
 # A Oracle entrega imagens Ubuntu com iptables restritivo ALEM da Security
 # List do console. Esquecer disto e o motivo numero um de "abri a porta no
-# painel e mesmo assim nao responde".
-if command -v netfilter-persistent &>/dev/null || [[ -f /etc/iptables/rules.v4 ]]; then
-	# Posicao 1 de proposito. O conselho comum e inserir na 6, contando com o
-	# conjunto padrao da Oracle ter cinco regras antes do REJECT. Se o
-	# conjunto for diferente, a regra cai DEPOIS do REJECT e nao serve para
-	# nada. No topo, um ACCEPT de porta especifica e sempre efetivo e nao
-	# atrapalha as regras de conexao estabelecida que vem em seguida.
-	iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
-	iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
-	netfilter-persistent save 2>/dev/null || true
-	echo "    iptables liberado para 80 e 443"
-fi
+# painel e mesmo assim nao responde". O pacote iptables-persistent, instalado
+# no passo 1, restaura estas regras automaticamente em todo boot.
+# Posicao 1 de proposito. O conselho comum e inserir na 6, contando com o
+# conjunto padrao da Oracle ter cinco regras antes do REJECT. Se o conjunto
+# for diferente, a regra cai DEPOIS do REJECT e nao serve para nada.
+iptables -C INPUT -p tcp --dport 80 -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport 80 -j ACCEPT
+iptables -C INPUT -p tcp --dport 443 -j ACCEPT 2>/dev/null || iptables -I INPUT 1 -p tcp --dport 443 -j ACCEPT
+netfilter-persistent save >/dev/null
+echo "    iptables liberado para 80 e 443 e salvo para os proximos boots"
 if command -v ufw &>/dev/null && ufw status | grep -q "Status: active"; then
 	ufw allow 80/tcp >/dev/null
 	ufw allow 443/tcp >/dev/null

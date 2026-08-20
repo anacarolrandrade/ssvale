@@ -16,9 +16,9 @@ Tempo: cerca de 40 minutos, sendo 20 esperando a Oracle criar a maquina.
 1. Cartao de credito (a Oracle usa so para verificar identidade; a camada
    Always Free nao cobra).
 2. Um dominio ou subdominio que voce controle.
-3. Um Personal Access Token do GitHub, escopo `repo`, para clonar o
-   repositorio privado. GitHub / Settings / Developer settings / Personal
-   access tokens.
+3. Um Personal Access Token **fine-grained** do GitHub, restrito ao repositorio
+   `ssvale`, com permissao `Contents: Read-only`. Ele sera digitado de forma
+   oculta e pode ser revogado assim que a instalacao terminar.
 
 ---
 
@@ -93,10 +93,12 @@ certificado ao Let's Encrypt, que so emite se o dominio ja apontar para ca.
 
 ## 5. Conectar no servidor
 
-No PowerShell, na pasta onde voce salvou a chave privada:
+No PowerShell, envie primeiro o script que ja esta no seu projeto. Isso evita
+colocar o token do GitHub em um comando `curl`:
 
 ```powershell
 icacls ssh-key.key /inheritance:r /grant:r "$($env:USERNAME):(R)"
+scp -i ssh-key.key C:\ssvale-chatbot-mvp\deploy\provisionar.sh ubuntu@SEU_IP_PUBLICO:/tmp/provisionar.sh
 ssh -i ssh-key.key ubuntu@SEU_IP_PUBLICO
 ```
 
@@ -110,16 +112,15 @@ A partir daqui voce esta dentro do servidor.
 ## 6. Provisionar - o unico comando que importa
 
 ```bash
-curl -fsSL -H "Authorization: token SEU_TOKEN_GITHUB" \
-  https://raw.githubusercontent.com/anacarolrandrade/ssvale/main/deploy/provisionar.sh \
-  -o provisionar.sh
-
-sudo bash provisionar.sh sofia-teste.seudominio.com.br SEU_TOKEN_GITHUB
+sudo bash /tmp/provisionar.sh sofia-teste.seudominio.com.br
 ```
 
 Cerca de tres minutos. O script cria usuario e diretorios, clona o codigo,
 **gera segredos novos** (nao reaproveita os da sua maquina), instala o Caddy
-com HTTPS automatico, abre o `iptables`, instala o servico e sobe.
+com HTTPS automatico, abre e persiste o `iptables`, instala o servico e sobe.
+Quando pedir o token do GitHub, cole-o e pressione Enter. Nada aparece na tela:
+isso e proposital. O token nao entra no historico nem fica gravado no remoto do
+Git. Revogue o token no GitHub depois que a verificacao terminar.
 
 Ao final ele imprime a URL do webhook e o token de status. **Copie os dois.**
 
@@ -169,7 +170,7 @@ sudo systemctl start sofia             # religar
 sudo systemctl restart sofia           # reiniciar
 curl -H "X-Status-Token: TOKEN" https://SEU_DOMINIO/status   # contadores
 
-cd /opt/sofia && sudo git pull && sudo systemctl restart sofia   # atualizar
+sudo bash /opt/sofia/deploy/provisionar.sh SEU_DOMINIO   # atualizar com token oculto
 ```
 
 ---

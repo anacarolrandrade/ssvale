@@ -278,5 +278,31 @@ class FusoDeBrasiliaTest(unittest.TestCase):
         self.assertAlmostEqual(diferenca_horas, 3.0, delta=0.1)
 
 
+class ProvisionamentoSeguroTest(unittest.TestCase):
+    """Regressoes para credencial temporaria e firewall persistente da VPS."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.script = (PROJECT_ROOT / "deploy" / "provisionar.sh").read_text(
+            encoding="utf-8"
+        )
+
+    def test_token_nao_e_recebido_em_argumento_nem_colocado_na_url(self) -> None:
+        self.assertNotIn('TOKEN_GITHUB="${2:-}"', self.script)
+        self.assertNotIn('https://${TOKEN_GITHUB}@', self.script)
+        self.assertIn('read -r -s -p', self.script)
+        self.assertIn('GIT_ASKPASS="$ASKPASS_FILE"', self.script)
+
+    def test_auxiliar_de_credencial_e_temporario(self) -> None:
+        self.assertIn("mktemp /tmp/sofia-git-askpass.", self.script)
+        self.assertIn('rm -f -- "$ASKPASS_FILE"', self.script)
+        self.assertIn("unset SOFIA_GITHUB_TOKEN TOKEN_GITHUB", self.script)
+
+    def test_regras_de_firewall_sao_persistidas(self) -> None:
+        self.assertIn("iptables-persistent", self.script)
+        self.assertIn("netfilter-persistent save", self.script)
+        self.assertNotIn("netfilter-persistent save 2>/dev/null || true", self.script)
+
+
 if __name__ == "__main__":
     unittest.main()
