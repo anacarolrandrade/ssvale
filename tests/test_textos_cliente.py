@@ -67,6 +67,9 @@ CONVERSAS = {
         "Suporte / Pos-venda",
         "Sim",
         "Manutencao",
+        "Forno modelo X",
+        "Nao aquece",
+        "Equipamento parado",
         "Ana",
         "Taubate SP",
     ],
@@ -85,10 +88,12 @@ CONVERSAS = {
         "Fornecedor / Representante",
         "Equipamentos Alfa",
         "Fornecedor",
+        "Pecas para cozinha industrial",
+        "Apresentar catalogo",
         "Beatriz",
         "Belo Horizonte, MG",
     ],
-    "compras_online": ["Comprei pelo site", "Pedido ja feito", "Juliana", "Sao Paulo"],
+    "compras_online": ["Comprei pelo site", "Pedido ja feito", "Pedido 123", "Acompanhar entrega", "Não se aplica", "Juliana", "Sao Paulo, SP"],
     "suporte_direto": ["Comecar", "meu freezer esta com defeito"],
 }
 
@@ -103,8 +108,8 @@ def palavras_sem_acento(texto: str) -> set[str]:
 
 class TextosDoClienteTest(unittest.TestCase):
     def test_mensagens_de_limite_estao_acentuadas(self) -> None:
-        self.assertIn("não consigo tratar isso", commercial_limit_message())
-        self.assertIn("informações", commercial_limit_message())
+        self.assertIn("Vou encaminhar seu pedido", commercial_limit_message())
+        self.assertIn("condições", commercial_limit_message())
         self.assertIn("não consigo fazer diagnóstico técnico", support_limit_message())
         self.assertIn("solicitação", support_limit_message())
 

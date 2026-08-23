@@ -17,6 +17,12 @@ _POS_VENDA_REGEX = re.compile(r"\bpos[\s\-]?venda\b|\bpos\b|\bsuporte\b")
 _GREETING_REGEX = re.compile(
     r"^(oi|ola|bom\s+dia|boa\s+tarde|boa\s+noite|comecar|inicio|menu)[!.?\s]*$"
 )
+_RESTART_REGEX = re.compile(r"^(comecar|iniciar|inicio|menu)[!.?\s]*$")
+_BRAZIL_UFS = {
+    "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT",
+    "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO",
+    "RR", "SC", "SP", "SE", "TO",
+}
 
 
 def agora_utc() -> datetime:
@@ -137,7 +143,7 @@ EQUIPMENT_QUESTIONS = {
     "BLOCO_EQ_FREEZER_Q2": ("O que vai guardar?", ["Bebidas", "Carnes", "Laticínios", "Congelados", "Outros"], "BLOCO_EQ_FREEZER_Q3", "pergunta_2"),
     "BLOCO_EQ_FREEZER_Q3": ("Já sabe o tamanho?", ["Pequeno", "Médio", "Grande", "Tenho medidas", "Não sei"], "BLOCO_COLETA_NOME", "pergunta_3"),
     "BLOCO_EQ_FORNO_Q1": ("O que você vai assar?", ["Pães", "Pizzas", "Bolos", "Salgados", "Assados", "Variados"], "BLOCO_EQ_FORNO_Q2", "pergunta_1"),
-    "BLOCO_EQ_FORNO_Q2": ("Prefere algum tipo?", ["A gás", "Elétrico", "Pizza", "Combinado", "Quero ajuda"], "BLOCO_EQ_FORNO_Q3", "pergunta_2"),
+    "BLOCO_EQ_FORNO_Q2": ("Prefere algum tipo?", ["A gás", "Elétrico", "Forno específico para pizza", "Combinado", "Quero ajuda"], "BLOCO_EQ_FORNO_Q3", "pergunta_2"),
     "BLOCO_EQ_FORNO_Q3": ("O uso será como?", ["Pouco uso", "Uso médio", "Uso alto", "Ainda não sei"], "BLOCO_COLETA_NOME", "pergunta_3"),
     "BLOCO_EQ_FOGAO_Q1": ("Quantas bocas precisa?", ["2", "4", "6", "8 ou mais", "Ainda não sei"], "BLOCO_EQ_FOGAO_Q2", "pergunta_1"),
     "BLOCO_EQ_FOGAO_Q2": ("Onde será usado?", ["Restaurante", "Lanchonete", "Cozinha industrial", "Buffet", "Outro"], "BLOCO_EQ_FOGAO_Q3", "pergunta_2"),
@@ -159,8 +165,13 @@ ANSWER_LABELS = {
     "projeto_status": "Status do projeto",
     "ja_comprou_ssvale": "Já comprou com a SS Vale",
     "assunto_pos_venda": "Assunto de pós-venda",
+    "equipamento_ou_pedido_pos_venda": "Equipamento ou pedido",
+    "detalhes_pos_venda": "Descrição do problema",
+    "urgencia_pos_venda": "Urgência operacional",
     "empresa_fornecedor": "Empresa",
     "tipo_contato_fornecedor": "Tipo de contato",
+    "oferta_fornecedor": "Produto ou serviço oferecido",
+    "objetivo_fornecedor": "Objetivo do contato",
 }
 
 
@@ -226,6 +237,12 @@ class SofiaFlow:
                 summary=self._summary(state),
                 tags=sorted(state.tags),
             )
+
+        if (
+            state.current_block != "BLOCO_00_BOAS_VINDAS"
+            and _RESTART_REGEX.match(normalize_for_matching(text))
+        ):
+            return self._restart(state)
 
         if state.current_block == "BLOCO_00_BOAS_VINDAS":
             greeting = self.start(state)
@@ -310,12 +327,17 @@ class SofiaFlow:
         if state.current_block == "BLOCO_04_SUPORTE_POS_VENDA":
             if "ja_comprou_ssvale" not in state.lead.respostas:
                 return ["Sim", "Não", "Não sei informar"]
-            if "compras_online" in state.tags and "assunto_pos_venda" not in state.lead.respostas:
-                return ["Pedido já feito", "Entrega", "Troca", "Outro"]
-            return ["Garantia", "Instalação", "Manutenção", "Troca", "Pedido já feito", "Outro"]
+            if "assunto_pos_venda" not in state.lead.respostas:
+                if "compras_online" in state.tags:
+                    return ["Pedido já feito", "Entrega", "Troca", "Outro"]
+                return ["Garantia", "Instalação", "Manutenção", "Troca", "Pedido já feito", "Outro"]
+            if "detalhes_pos_venda" in state.lead.respostas:
+                return ["Equipamento parado", "Funcionando parcialmente", "Dúvida sem parada", "Não se aplica"]
+            return []
         if (
             state.current_block == "BLOCO_05_FORNECEDOR_REPRESENTANTE"
             and "empresa_fornecedor" in state.lead.respostas
+            and "tipo_contato_fornecedor" not in state.lead.respostas
         ):
             return ["Fornecedor", "Representante", "Parceria", "Outro"]
         return []
@@ -431,7 +453,11 @@ class SofiaFlow:
 
     def _handle_equipment_question(self, state: ConversationState, text: str) -> BotReply:
         question, options, next_block, answer_key = EQUIPMENT_QUESTIONS[state.current_block]
-        state.lead.respostas[answer_key] = text
+        chosen = self._match_option(text, options)
+        if not chosen:
+            return self._invalid_choice(state, question, options)
+
+        state.lead.respostas[answer_key] = chosen
         state.current_block = next_block
 
         if next_block == "BLOCO_COLETA_NOME":
@@ -443,23 +469,89 @@ class SofiaFlow:
     def _project_kitchen(self, state: ConversationState, text: str) -> BotReply:
         answers = state.lead.respostas
         if "projeto_status" not in answers:
-            answers["projeto_status"] = text
+            options = ["Montando", "Reformando", "Ampliando", "Ainda estou planejando"]
+            chosen = self._match_option(text, options)
+            if not chosen:
+                return self._invalid_choice(
+                    state,
+                    "Você está montando, reformando ou ampliando uma cozinha?",
+                    options,
+                )
+            answers["projeto_status"] = chosen
             return BotReply("Qual é o tipo de negócio?", ["Restaurante", "Lanchonete", "Padaria", "Mercado", "Cozinha industrial", "Outro"], state.current_block, tags=sorted(state.tags))
         if not state.lead.tipo_negocio:
-            state.lead.tipo_negocio = text
+            options = ["Restaurante", "Lanchonete", "Padaria", "Mercado", "Cozinha industrial", "Outro"]
+            chosen = self._match_option(text, options)
+            if not chosen:
+                return self._invalid_choice(state, "Qual é o tipo de negócio?", options)
+            state.lead.tipo_negocio = chosen
             return BotReply("Quando pretende comprar os equipamentos?", ["Agora", "Em até 30 dias", "Em 1 a 3 meses", "Ainda estou pesquisando"], state.current_block, tags=sorted(state.tags))
 
-        state.lead.previsao_compra = text
+        options = ["Agora", "Em até 30 dias", "Em 1 a 3 meses", "Ainda estou pesquisando"]
+        chosen = self._match_option(text, options)
+        if not chosen:
+            return self._invalid_choice(
+                state, "Quando pretende comprar os equipamentos?", options
+            )
+        state.lead.previsao_compra = chosen
         state.current_block = "BLOCO_COLETA_NOME"
         return BotReply("Qual é o seu nome?", next_block=state.current_block, tags=sorted(state.tags))
 
     def _support(self, state: ConversationState, text: str) -> BotReply:
         answers = state.lead.respostas
         if "ja_comprou_ssvale" not in answers:
-            answers["ja_comprou_ssvale"] = text
-            return BotReply("Sobre qual assunto você precisa de ajuda?", ["Garantia", "Instalação", "Manutenção", "Troca", "Pedido já feito", "Outro"], state.current_block, tags=sorted(state.tags))
+            options = ["Sim", "Não", "Não sei informar"]
+            chosen = self._match_option(text, options)
+            if not chosen:
+                return self._invalid_choice(
+                    state, "Você já comprou com a SS Vale?", options
+                )
+            answers["ja_comprou_ssvale"] = chosen
+            options = ["Garantia", "Instalação", "Manutenção", "Troca", "Pedido já feito", "Outro"]
+            return BotReply("Sobre qual assunto você precisa de ajuda?", options, state.current_block, tags=sorted(state.tags))
 
-        answers["assunto_pos_venda"] = text
+        if "assunto_pos_venda" not in answers:
+            options = (
+                ["Pedido já feito", "Entrega", "Troca", "Outro"]
+                if "compras_online" in state.tags
+                else ["Garantia", "Instalação", "Manutenção", "Troca", "Pedido já feito", "Outro"]
+            )
+            chosen = self._match_option(text, options)
+            if not chosen:
+                return self._invalid_choice(
+                    state, "Sobre qual assunto você precisa de ajuda?", options
+                )
+            answers["assunto_pos_venda"] = chosen
+            return BotReply(
+                "Qual é o equipamento ou o número do pedido? Se não tiver essa informação, escreva ‘Não sei’.",
+                next_block=state.current_block,
+                tags=sorted(state.tags),
+            )
+
+        if "equipamento_ou_pedido_pos_venda" not in answers:
+            answers["equipamento_ou_pedido_pos_venda"] = text
+            return BotReply(
+                "Descreva brevemente o problema ou a ajuda de que precisa.",
+                next_block=state.current_block,
+                tags=sorted(state.tags),
+            )
+
+        if "detalhes_pos_venda" not in answers:
+            answers["detalhes_pos_venda"] = text
+            return BotReply(
+                "Qual é a urgência para a sua operação?",
+                ["Equipamento parado", "Funcionando parcialmente", "Dúvida sem parada", "Não se aplica"],
+                state.current_block,
+                tags=sorted(state.tags),
+            )
+
+        options = ["Equipamento parado", "Funcionando parcialmente", "Dúvida sem parada", "Não se aplica"]
+        chosen = self._match_option(text, options)
+        if not chosen:
+            return self._invalid_choice(
+                state, "Qual é a urgência para a sua operação?", options
+            )
+        answers["urgencia_pos_venda"] = chosen
         state.current_block = "BLOCO_COLETA_NOME"
         return BotReply("Qual é o seu nome?", next_block=state.current_block, tags=sorted(state.tags))
 
@@ -469,7 +561,29 @@ class SofiaFlow:
             answers["empresa_fornecedor"] = text
             return BotReply("Qual é o tipo de contato?", ["Fornecedor", "Representante", "Parceria", "Outro"], state.current_block, tags=sorted(state.tags))
 
-        answers["tipo_contato_fornecedor"] = text
+        if "tipo_contato_fornecedor" not in answers:
+            options = ["Fornecedor", "Representante", "Parceria", "Outro"]
+            chosen = self._match_option(text, options)
+            if not chosen:
+                return self._invalid_choice(
+                    state, "Qual é o tipo de contato?", options
+                )
+            answers["tipo_contato_fornecedor"] = chosen
+            return BotReply(
+                "Qual produto ou serviço sua empresa oferece?",
+                next_block=state.current_block,
+                tags=sorted(state.tags),
+            )
+
+        if "oferta_fornecedor" not in answers:
+            answers["oferta_fornecedor"] = text
+            return BotReply(
+                "Qual é o objetivo deste contato com a SS Vale?",
+                next_block=state.current_block,
+                tags=sorted(state.tags),
+            )
+
+        answers["objetivo_fornecedor"] = text
         state.current_block = "BLOCO_COLETA_NOME"
         return BotReply("Qual é o seu nome?", next_block=state.current_block, tags=sorted(state.tags))
 
@@ -489,6 +603,13 @@ class SofiaFlow:
             state.lead.telefone_whatsapp = text
             state.current_block = "BLOCO_COLETA_CIDADE"
             return BotReply("Você fala de qual cidade e estado?", next_block=state.current_block, tags=sorted(state.tags))
+
+        if not self._has_city_and_state(text):
+            return BotReply(
+                "Informe também a sigla do estado, por exemplo: São José dos Campos - SP.",
+                next_block=state.current_block,
+                tags=sorted(state.tags),
+            )
 
         state.lead.cidade_estado = text
         state.tags.add("lead_mvp_qualificado")
@@ -523,6 +644,33 @@ class SofiaFlow:
         return BotReply(
             "Não consegui entender. Pode escolher uma das opções do menu?",
             MENU_OPTIONS,
+            state.current_block,
+            tags=sorted(state.tags),
+        )
+
+    def _restart(self, state: ConversationState) -> BotReply:
+        state.current_block = "BLOCO_00_BOAS_VINDAS"
+        state.tags.clear()
+        state.lead.nome_cliente = None
+        state.lead.telefone_whatsapp = None
+        state.lead.cidade_estado = None
+        state.lead.motivo_contato = None
+        state.lead.equipamento_interesse = None
+        state.lead.tipo_negocio = None
+        state.lead.previsao_compra = None
+        state.lead.respostas.clear()
+        state.status = ConversationStatus.ACTIVE
+        state.handoff_since = None
+        return self.start(state)
+
+    @staticmethod
+    def _invalid_choice(
+        state: ConversationState, question: str, options: list[str]
+    ) -> BotReply:
+        state.tags.add("resposta_nao_entendida")
+        return BotReply(
+            f"Não consegui identificar essa opção. {question}",
+            options,
             state.current_block,
             tags=sorted(state.tags),
         )
@@ -570,9 +718,21 @@ class SofiaFlow:
         normalized = normalize_for_matching(text)
         for option in options:
             normalized_option = normalize_for_matching(option)
-            if normalized == normalized_option or normalized in normalized_option:
+            if (
+                normalized == normalized_option
+                or normalized in normalized_option
+                or normalized_option in normalized
+            ):
                 return option
         return None
+
+    @staticmethod
+    def _has_city_and_state(text: str) -> bool:
+        normalized = normalize_for_matching(text).upper()
+        return any(
+            re.search(rf"(?<![A-Z]){uf}(?![A-Z])", normalized)
+            for uf in _BRAZIL_UFS
+        )
 
     @staticmethod
     def _match_equipment_alias(normalized_text: str) -> str | None:

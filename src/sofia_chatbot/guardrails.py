@@ -73,8 +73,8 @@ def contains_sensitive_commercial_request(text: str, contextual_delivery: bool =
 
 def commercial_limit_message() -> str:
     return (
-        "Eu não consigo tratar isso por aqui, mas vou encaminhar suas informações "
-        "para um consultor da SS Vale te orientar corretamente."
+        "Vou encaminhar seu pedido a um consultor da SS Vale para confirmar "
+        "preço, disponibilidade, prazo e demais condições."
     )
 
 

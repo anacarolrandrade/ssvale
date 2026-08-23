@@ -153,3 +153,77 @@ py scripts/homologar_canais.py
 
 Resultado validado apos a primeira janela: 75 testes, smoke test aprovado e
 homologacao de 5 cenarios/26 interacoes nos tres canais.
+
+## Achados do piloto de 23/08/2026
+
+- **Texto do fluxo de Forno:** a pergunta `Prefere algum tipo?` apresenta as
+  opcoes `A gas`, `Eletrico`, `Pizza`, `Combinado` e `Quero ajuda`. A opcao
+  `Pizza` mistura finalidade com fonte de energia e repete uma informacao que
+  ja pode ter sido coletada em `O que voce vai assar?`.
+- **Correcao apos o piloto:** decidir entre remover `Pizza` dessa pergunta ou
+  renomear para `Forno especifico para pizza`. Aplicar a decisao de forma
+  consistente em `src/sofia_chatbot/flow.py`, matriz/roteiros, exemplos e
+  testes automatizados. Nao alterar o fluxo durante a janela em andamento.
+- **Validacao das respostas:** no caminho `Equipamento especifico > Forno`, a
+  resposta livre `banana` para `O que voce vai assar?` foi aceita e o fluxo
+  avancou. O esperado e aceitar apenas as opcoes numeradas e os respectivos
+  textos/sinonimos previstos; qualquer outro valor deve repetir a pergunta com
+  uma orientacao clara, sem salvar a resposta nem avancar de etapa.
+- **Correcao apos o piloto:** validar as respostas de todas as perguntas de
+  escolha, e nao apenas desse caminho, cobrindo entrada invalida com testes
+  automatizados.
+- **Reinicio durante o fluxo:** ao receber `comecar` na pergunta `Prefere algum
+  tipo?`, a Sofia nao reiniciou o atendimento; tratou o texto como resposta e
+  avancou para `O uso sera como?`.
+- **Correcao apos o piloto:** reconhecer globalmente comandos de reinicio como
+  `comecar`, `iniciar`, `inicio`, `menu` e suas variacoes com acento, antes de
+  processar a etapa atual. O comando deve limpar os dados parciais e exibir o
+  menu inicial. Adicionar testes de reinicio partindo de todas as etapas.
+- **Cenario de projeto de cozinha aprovado:** o caminho `Montar ou reformar uma
+  cozinha > Reformando > Restaurante > Em ate 30 dias` chegou corretamente a
+  coleta de nome, cidade/estado e mensagem final. As respostas por texto, em
+  vez dos numeros, foram reconhecidas nesse caminho.
+- **Pendente de validacao:** a mensagem final afirma que a equipe continuara o
+  atendimento, mas ainda e necessario confirmar a criacao/transferencia real
+  do atendimento no Maxbot e se os dados coletados ficam visiveis para o
+  atendente.
+- **Cenario de suporte aprovado parcialmente:** o caminho `Suporte / Pos-venda
+  > Ja comprou: Sim > Manutencao` chegou sem erro a coleta de nome e localidade
+  e exibiu a mensagem final.
+- **Dados insuficientes para suporte:** o fluxo encerrou sem coletar equipamento,
+  numero do pedido/nota fiscal, descricao do problema ou urgencia. Para
+  manutencao, garantia, instalacao, troca e pedido ja feito, definir perguntas
+  minimas especificas antes do encaminhamento, evitando solicitar dados
+  sensiveis desnecessarios.
+- **Validacao de localidade:** `sjc-sp` foi aceita. Decidir se abreviacoes
+  conhecidas devem ser normalizadas (`Sao Jose dos Campos - SP`) ou se o bot
+  deve pedir cidade e UF novamente quando a entrada nao for suficientemente
+  clara.
+- **Cenario de fornecedor aprovado parcialmente:** o caminho `Fornecedor /
+  Representante > empresa We up > Fornecedor` chegou sem erro a coleta de nome,
+  localidade e mensagem final.
+- **Qualificacao insuficiente de fornecedor:** antes de encaminhar, coletar o
+  produto/servico oferecido e um resumo do objetivo do contato. Avaliar com a
+  equipe de Compras se algum identificador empresarial e realmente necessario;
+  evitar pedir CNPJ ou outros dados sensiveis sem finalidade definida.
+- **Cidade sem UF:** `Sao Jose dos Campos` foi aceita apesar da pergunta exigir
+  cidade e estado. Validar a presenca da UF ou solicitar apenas o dado faltante,
+  preservando a cidade ja informada.
+- **Cenario de consultor aprovado:** a entrada textual `Consultor` foi
+  reconhecida no menu, a necessidade livre (`preco e prazo de entrega de um
+  forno`) foi coletada e o fluxo pediu nome e cidade/UF antes da mensagem final.
+- **Ajuste de linguagem:** substituir `Eu nao consigo tratar isso por aqui` por
+  uma transicao mais acolhedora, como `Vou encaminhar seu pedido a um consultor
+  para confirmar preco, disponibilidade e prazo`, sem prometer informacoes que
+  o bot nao possui.
+- **Pendente:** confirmar no Maxbot se a descricao livre, o nome e a localidade
+  chegam ao consultor e se o atendimento e efetivamente colocado na fila certa.
+- **Encaminhamento humano reprovado no Maxbot:** apos o cenario `Falar com
+  consultor`, a fila `Aguardando` estava vazia, o unico item em `Em Atendimento`
+  pertencia a outro contato e a busca pelo telefone piloto nao retornou o
+  atendimento nessas filas. A Sofia exibiu a promessa de continuidade, mas nao
+  criou/transferiu o atendimento para o consultor.
+- **Bloqueio de producao:** nao liberar o bot para clientes reais enquanto o
+  handoff nao criar um protocolo no setor correto, incluir o resumo e os dados
+  coletados e ficar visivel para um atendente. Depois da implementacao, repetir
+  a verificacao de ponta a ponta no Maxbot.

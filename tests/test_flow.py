@@ -32,7 +32,7 @@ class SofiaFlowTest(unittest.TestCase):
         scenarios = [
             ("Fritadeira", ["Batata", "Uso alto", "Quero ajuda"], "equipamento_fritadeira"),
             ("Freezer / Refrigeração", ["Congelar", "Carnes", "Grande"], "equipamento_freezer_refrigeracao"),
-            ("Forno", ["Pizzas", "Pizza", "Uso medio"], "equipamento_forno"),
+            ("Forno", ["Pizzas", "Forno específico para pizza", "Uso medio"], "equipamento_forno"),
             ("Fogão Industrial", ["6", "Restaurante", "Nao sei"], "equipamento_fogao_industrial"),
             ("Chapa", ["Hamburguer", "Grande", "A gas"], "equipamento_chapa"),
             ("Outro equipamento", ["Nao sei o nome", "Preparar", "Padaria"], "equipamento_outro"),
@@ -72,6 +72,20 @@ class SofiaFlowTest(unittest.TestCase):
         self.assertIn("Falar com consultor", reply.options)
         self.assertNotIn("resposta_nao_entendida", reply.tags)
 
+    def test_restart_command_works_mid_flow_and_clears_partial_data(self) -> None:
+        self.send("Comecar")
+        self.send("1")
+        self.send("3")
+        self.send("Pães")
+
+        reply = self.send("começar")
+
+        self.assertEqual(reply.next_block, "BLOCO_01_MENU_INICIAL")
+        self.assertEqual(reply.options, MENU_OPTIONS)
+        self.assertIsNone(self.state.lead.equipamento_interesse)
+        self.assertEqual(self.state.lead.respostas, {})
+        self.assertNotIn("equipamento_forno", self.state.tags)
+
     def test_main_menu_accepts_numeric_options(self) -> None:
         self.send("Comecar")
         reply = self.send("1")
@@ -86,6 +100,18 @@ class SofiaFlowTest(unittest.TestCase):
 
         self.assertEqual(reply.next_block, "BLOCO_EQ_FRITADEIRA_Q1")
         self.assertIn("equipamento_fritadeira", reply.tags)
+
+    def test_invalid_equipment_answer_repeats_same_question(self) -> None:
+        self.send("Comecar")
+        self.send("1")
+        self.send("3")
+
+        reply = self.send("banana")
+
+        self.assertEqual(reply.next_block, "BLOCO_EQ_FORNO_Q1")
+        self.assertIn("Não consegui identificar essa opção", reply.message)
+        self.assertIn("Pães", reply.options)
+        self.assertNotIn("pergunta_1", self.state.lead.respostas)
 
     def test_direct_equipment_name_from_main_menu(self) -> None:
         self.send("Comecar")
@@ -107,19 +133,24 @@ class SofiaFlowTest(unittest.TestCase):
         self.assertIn("projeto_cozinha", reply.tags)
         self.assertIn("encaminhar_comercial", reply.tags)
         self.assertIn("Restaurante", reply.summary or "")
-        self.assertIn("Em ate 30 dias", reply.summary or "")
+        self.assertIn("Em até 30 dias", reply.summary or "")
 
     def test_support_handoff_to_pos_venda(self) -> None:
         self.send("Comecar")
         self.send("Suporte / Pos-venda")
         self.send("Sim")
         self.send("Manutencao")
+        self.send("Forno modelo X")
+        self.send("Não está aquecendo")
+        self.send("Equipamento parado")
         reply = self.complete_lead("Roberto")
 
         self.assertEqual(reply.status, ConversationStatus.HANDOFF)
         self.assertIn("pos_venda", reply.tags)
         self.assertIn("encaminhar_pos_venda", reply.tags)
         self.assertNotIn("encaminhar_comercial", reply.tags)
+        self.assertIn("Equipamento ou pedido: Forno modelo X", reply.summary or "")
+        self.assertIn("Urgência operacional: Equipamento parado", reply.summary or "")
 
     def test_direct_support_message_shows_limit(self) -> None:
         self.send("Comecar")
@@ -134,12 +165,15 @@ class SofiaFlowTest(unittest.TestCase):
         self.send("Fornecedor / Representante")
         self.send("Equipamentos Alfa")
         self.send("Fornecedor")
+        self.send("Peças para equipamentos industriais")
+        self.send("Apresentar catálogo para o setor de Compras")
         reply = self.complete_lead("Rafael")
 
         self.assertEqual(reply.status, ConversationStatus.HANDOFF)
         self.assertIn("fornecedor_representante", reply.tags)
         self.assertIn("encaminhar_compras", reply.tags)
         self.assertIn("Destino: Compras", reply.summary or "")
+        self.assertIn("Produto ou serviço oferecido: Peças", reply.summary or "")
 
     def test_site_purchase_handoff_to_compras_online(self) -> None:
         first = self.send("Comprei pelo site")
@@ -147,6 +181,9 @@ class SofiaFlowTest(unittest.TestCase):
         self.assertIn("compras_online", first.tags)
 
         self.send("Pedido ja feito")
+        self.send("Pedido 123")
+        self.send("Quero acompanhar a entrega")
+        self.send("Não se aplica")
         handoff = self.complete_lead("Marina")
 
         self.assertEqual(
@@ -170,7 +207,7 @@ class SofiaFlowTest(unittest.TestCase):
         self.send("Comecar")
         reply = self.send("Qual o preco e o frete?")
 
-        self.assertIn("não consigo tratar isso", reply.message)
+        self.assertIn("Vou encaminhar seu pedido", reply.message)
         self.assertEqual(reply.next_block, "BLOCO_COLETA_NOME")
         self.assertIn("bloqueio_comercial", reply.tags)
         self.assertEqual(self.state.lead.respostas["pedido_sensivel"], "Qual o preco e o frete?")
@@ -196,7 +233,7 @@ class SofiaFlowTest(unittest.TestCase):
                 self.send("Comecar")
                 reply = self.send(phrase)
 
-                self.assertIn("não consigo tratar isso", reply.message)
+                self.assertIn("Vou encaminhar seu pedido", reply.message)
                 self.assertIn("bloqueio_comercial", reply.tags)
 
     def test_sensitive_request_during_collection_does_not_restart_name(self) -> None:
@@ -217,6 +254,23 @@ class SofiaFlowTest(unittest.TestCase):
         self.assertIn("Não consegui entender", reply.message)
         self.assertEqual(reply.next_block, "BLOCO_01_MENU_INICIAL")
         self.assertIn("resposta_nao_entendida", reply.tags)
+
+    def test_city_without_state_is_rejected_without_losing_city_step(self) -> None:
+        self.state.lead.telefone_whatsapp = "5512999990000"
+        self.send("Comecar")
+        self.send("Falar com consultor")
+        self.send("Quero comprar um forno")
+        self.send("Ana")
+
+        reply = self.send("São José dos Campos")
+
+        self.assertEqual(reply.status, ConversationStatus.ACTIVE)
+        self.assertEqual(reply.next_block, "BLOCO_COLETA_CIDADE")
+        self.assertIn("sigla do estado", reply.message)
+        self.assertIsNone(self.state.lead.cidade_estado)
+
+        handoff = self.send("São José dos Campos - SP")
+        self.assertEqual(handoff.status, ConversationStatus.HANDOFF)
 
     def test_after_handoff_bot_does_not_restart_menu(self) -> None:
         self.send("Comecar")
@@ -253,7 +307,7 @@ class SofiaFlowTest(unittest.TestCase):
                 self.send("Comecar")
                 reply = self.send(phrase)
 
-                self.assertIn("não consigo tratar isso", reply.message)
+                self.assertIn("Vou encaminhar seu pedido", reply.message)
                 self.assertIn("bloqueio_comercial", reply.tags)
 
     def test_guardrail_avoids_substring_false_positives(self) -> None:
@@ -321,7 +375,7 @@ class SofiaFlowTest(unittest.TestCase):
 
         self.assertNotIn("bloqueio_comercial", reply.tags)
         self.assertEqual(reply.next_block, "BLOCO_EQ_CHAPA_Q2")
-        self.assertEqual(self.state.lead.respostas["pergunta_1"], "faco lanches para entrega")
+        self.assertEqual(self.state.lead.respostas["pergunta_1"], "Lanches")
 
     def test_delivery_question_remains_blocked_during_qualification(self) -> None:
         self.send("Comecar")

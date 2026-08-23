@@ -2,6 +2,24 @@
 
 Status do backend MVP da Sofia para primeiro teste controlado.
 
+## Correcoes apos o piloto de 23/08/2026
+
+- Comandos `comecar`, `iniciar`, `inicio` e `menu` agora reiniciam uma conversa
+  ativa em qualquer etapa e descartam os dados parciais.
+- Perguntas de escolha passaram a validar a resposta e repetir a mesma etapa
+  quando o valor nao corresponde a uma opcao; entradas como `banana` nao
+  avancam mais o fluxo de forno.
+- Cidade/estado exige uma UF valida antes do handoff.
+- Pos-venda coleta equipamento ou pedido, descricao e urgencia operacional.
+- Fornecedor coleta produto/servico oferecido e objetivo do contato.
+- A opcao de forno foi renomeada para `Forno especifico para pizza` e a
+  transicao para consultor recebeu linguagem mais acolhedora.
+- Validacao local: 149 testes, smoke, homologacao dos tres canais e ensaio da
+  janela aprovados.
+- **Bloqueio mantido:** o handoff real ainda depende da confirmacao do Maxbot
+  sobre como transferir o protocolo existente sem criar duplicidade. O piloto
+  comprovou que a implementacao atual nao coloca o contato na fila humana.
+
 ## Fase 3 concluida - observabilidade e handoff - 14/08/2026
 
 As duas lacunas que definiam se a Ana viraria suporte permanente do cliente.
